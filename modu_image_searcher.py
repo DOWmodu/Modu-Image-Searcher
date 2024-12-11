@@ -47,6 +47,9 @@ def preprocess_image(image):
     """Preprocess an image to feed into the MobileNetV2 model."""
     image = image.resize((224, 224))  # Resize to model input size
     image_array = np.array(image)
+    # Ensure the image has 3 color channels (RGB)
+    if image_array.shape[-1] != 3:
+        image_array = np.stack([image_array] * 3, axis=-1)
     return preprocess_input(np.expand_dims(image_array, axis=0))
 
 # Helper function to compute similarity
@@ -82,13 +85,16 @@ if st.button("Start Search"):
         dataset_features = []
         dataset_images = []
         for uploaded_file in uploaded_dataset_files:
-            image = Image.open(uploaded_file)
+            image = Image.open(uploaded_file).convert("RGB")  # Ensure RGB format
             dataset_images.append((uploaded_file.name, image))
 
             # Extract features for similarity search
             preprocessed_image = preprocess_image(image)
-            features = model_feature_extraction.predict(preprocessed_image)[0]
-            dataset_features.append(features)
+            try:
+                features = model_feature_extraction.predict(preprocessed_image)[0]
+                dataset_features.append(features)
+            except ValueError as e:
+                st.error(f"Error processing {uploaded_file.name}: {e}")
 
         results_found = False
 
@@ -99,14 +105,14 @@ if st.button("Start Search"):
             for name, image in dataset_images:
                 preprocessed_image = preprocess_image(image)
                 preds = model_classification.predict(preprocessed_image)
-                decoded_preds = decode_predictions(preds, top=5)[0]  # Works with include_top=True
+                decoded_preds = decode_predictions(preds, top=5)[0]
                 if any(keyword in label.lower() for keyword in keyword_list for _, label, _ in decoded_preds):
                     results_found = True
                     st.image(image, caption=f"{name} (Matched Keyword)", use_column_width=True)
 
         # Perform image-based search
         if uploaded_query_file:
-            query_image = Image.open(uploaded_query_file)
+            query_image = Image.open(uploaded_query_file).convert("RGB")  # Ensure RGB format
             st.image(query_image, caption="Query Image", use_column_width=True)
 
             # Extract features for the query image
@@ -127,7 +133,7 @@ if st.button("Start Search"):
                 st.image(image, caption=f"{name} (Similarity: {similarity:.2f})", use_column_width=True)
 
         if not results_found:
-            st.warning("No matches found.")
+            st.warning("No matches found. Please refine your search.")
 
 # Footer
 st.markdown(
