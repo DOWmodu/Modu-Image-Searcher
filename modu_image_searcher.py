@@ -38,8 +38,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Load the MobileNetV2 model
-model = MobileNetV2(weights="imagenet", include_top=False, pooling="avg")
+# Load MobileNetV2 models
+model_classification = MobileNetV2(weights="imagenet", include_top=True)  # For keyword-based search
+model_feature_extraction = MobileNetV2(weights="imagenet", include_top=False, pooling="avg")  # For image-based search
 
 # Helper function to preprocess images
 def preprocess_image(image):
@@ -84,9 +85,9 @@ if st.button("Start Search"):
             image = Image.open(uploaded_file)
             dataset_images.append((uploaded_file.name, image))
 
-            # Extract features
+            # Extract features for similarity search
             preprocessed_image = preprocess_image(image)
-            features = model.predict(preprocessed_image)[0]
+            features = model_feature_extraction.predict(preprocessed_image)[0]
             dataset_features.append(features)
 
         results_found = False
@@ -97,8 +98,8 @@ if st.button("Start Search"):
             st.write(f"Searching for: {keyword_list}")
             for name, image in dataset_images:
                 preprocessed_image = preprocess_image(image)
-                preds = model.predict(preprocessed_image)
-                decoded_preds = decode_predictions(preds, top=5)[0]
+                preds = model_classification.predict(preprocessed_image)
+                decoded_preds = decode_predictions(preds, top=5)[0]  # Works with include_top=True
                 if any(keyword in label.lower() for keyword in keyword_list for _, label, _ in decoded_preds):
                     results_found = True
                     st.image(image, caption=f"{name} (Matched Keyword)", use_column_width=True)
@@ -109,7 +110,7 @@ if st.button("Start Search"):
             st.image(query_image, caption="Query Image", use_column_width=True)
 
             # Extract features for the query image
-            query_features = model.predict(preprocess_image(query_image))[0]
+            query_features = model_feature_extraction.predict(preprocess_image(query_image))[0]
 
             # Compute similarity
             similarities = compute_similarity(query_features, dataset_features)
